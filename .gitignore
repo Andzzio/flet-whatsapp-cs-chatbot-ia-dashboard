@@ -2,4 +2,5 @@
 venv/
 #caché
 __pycache__
-
+#archivo de datos
+storage/data/data.json
