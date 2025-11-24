@@ -1,4 +1,6 @@
 import flet as ft
+import threading
+import time
 from src.data.data_manager import DataManager
 from src.models.message import Message
 from src.components.contact_card import ContactCard
@@ -11,7 +13,7 @@ class DashboardView(ft.Row):
         self.expand = True
         self.spacing = 0
         self.is_settings_open = False
-
+        
         self.data_manager = DataManager()
         self.current_contact = None
         
@@ -29,13 +31,24 @@ class DashboardView(ft.Row):
             content_padding=ft.padding.all(22),
             on_submit=self.send_message
         )
-        
         self._build_sidebar()
         self._build_chat_area()
         
         contacts = self.data_manager.get_contacts()
         if contacts:
             self.load_chat(contacts[0].name)
+        self._start_background_sync()
+    def _sync_loop(self):
+        while True:
+            self.data_manager.sync_from_server()
+            if not self.is_settings_open:
+                if self.current_contact:
+                    self.load_chat(self.current_contact.name)
+                self.update_view()
+            time.sleep(5)
+    def _start_background_sync(self):
+        thread = threading.Thread(target=self._sync_loop, daemon=True)
+        thread.start()
     def save_token(self, e):
         token = e.control.value
         self.data_manager.api_token = token
@@ -143,7 +156,7 @@ class DashboardView(ft.Row):
                     bgcolor="#6cb9f3",
                     height=60,
                 ),
-            ], spacing=0),
+            ], spacing=0, expand=True, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             expand=1,
         )
         self.controls.append(self.sidebar)

@@ -1,13 +1,37 @@
 import json
 import os
 from src.models.contact import Contact
+import requests
+import os
+import json
 
 class DataManager:
     def __init__(self):
         self.file_path = "storage/data/data.json"
         self.api_token = None
         self.contacts = {}
+        self.URL = "https://django-whatsapp-cs-chatbot-ia-backend.onrender.com/api/sync/"
         self.load_data()
+    def sync_from_server(self):
+        if self.api_token == None:
+            print("No hay token configurado")
+            return
+        try:
+            headers = {
+                "Authorization": self.api_token
+            }
+            response = requests.get(self.URL, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                server_contacts = data.get("contacts", [])
+                self.contacts = {}
+                for cont in server_contacts:
+                    contact = Contact.from_dict(cont)
+                    self.contacts[contact.name] = contact
+                self.save_data()
+                print("Sincronización exitosa")
+        except Exception as e:
+            print(e)
     def load_data(self):
         if not os.path.exists(self.file_path):
             self._create_initial_data()
