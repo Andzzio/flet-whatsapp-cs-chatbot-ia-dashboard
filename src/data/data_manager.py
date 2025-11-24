@@ -5,6 +5,7 @@ from src.models.contact import Contact
 class DataManager:
     def __init__(self):
         self.file_path = "storage/data/data.json"
+        self.api_token = None
         self.contacts = {}
         self.load_data()
     def load_data(self):
@@ -14,14 +15,19 @@ class DataManager:
         try:
             with open(self.file_path, "r", encoding="utf-8") as file:
                 data = json.load(file)
-                for contact_data in data:
+                self.api_token = data.get("api_token")
+                contact_list = data.get("contacts", [])
+                for contact_data in contact_list:
                     contact = Contact.from_dict(contact_data)
                     self.contacts[contact.name] = contact
         except Exception as e:
                 print(f"Error al cargar datos: {e}")
                 self._create_initial_data()
     def save_data(self):
-        data_to_save = [contact.to_dict() for contact in self.contacts.values()]
+        data_to_save = {
+            "api_token": self.api_token,
+            "contacts": [contact.to_dict() for contact in self.contacts.values()]
+        }
         os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
         with open(self.file_path, "w", encoding="utf-8") as file:
             json.dump(data_to_save, file, indent=4, ensure_ascii=False)
