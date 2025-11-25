@@ -44,6 +44,8 @@ jobs:
 
       - name: Build
         run: flet build ${{ matrix.platform }}
+        env:
+          PYTHONIOENCODING: utf-8
 
       - name: Prepare (Linux)
         if: matrix.os != 'windows-latest'
