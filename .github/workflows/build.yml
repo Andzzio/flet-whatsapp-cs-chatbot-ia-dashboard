@@ -74,7 +74,7 @@ jobs:
       - name: Create Release and Upload
         if: startsWith(github.ref, 'refs/tags/')
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         shell: bash
         run: |
           # Intentar crear el release. Si falla (porque existe), intentamos editarlo para asegurar que está activo
