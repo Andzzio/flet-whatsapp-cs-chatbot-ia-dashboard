@@ -67,12 +67,14 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: ${{ matrix.artifact-name }}.*
 
-      - name: Create Release
+      - name: Create Release and Upload
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ matrix.artifact-name }}.*
-          draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          # Intentar crear el release (si falla porque existe, no pasa nada)
+          gh release create ${{ github.ref_name }} --generate-notes || true
+
+          # Subir el archivo (sobrescribiendo si existe)
+          gh release upload ${{ github.ref_name }} ${{ matrix.artifact-name }}.* --clobber
