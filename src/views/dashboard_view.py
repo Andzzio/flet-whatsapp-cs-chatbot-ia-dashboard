@@ -1,6 +1,7 @@
 import flet as ft
 import threading
 import time
+import requests
 from src.data.data_manager import DataManager
 from src.models.message import Message
 from src.components.contact_card import ContactCard
@@ -15,6 +16,7 @@ class DashboardView(ft.Row):
         self.is_settings_open = False
         
         self.data_manager = DataManager()
+        self.bot_switch = ft.Switch(value=False, active_color="white", active_track_color="green", on_change=self.toggle_bot_for_contact)
         self.current_contact = None
         
         self.message_column = ft.ListView(expand=True, reverse=True)
@@ -40,11 +42,34 @@ class DashboardView(ft.Row):
         self._start_background_sync()
     def _sync_loop(self):
         while True:
+            # Guardar estado ANTES del sync
+            old_contact_count = len(self.data_manager.get_contacts())
+            old_message_count = len(self.current_contact.messages) if self.current_contact else 0
+            
+            # Sincronizar con el servidor
             self.data_manager.sync_from_server()
+            
             if not self.is_settings_open:
+                # Verificar cambios DESPUÉS del sync
+                new_contact_count = len(self.data_manager.get_contacts())
+                
                 if self.current_contact:
-                    self.load_chat(self.current_contact.name)
-                self.update_view()
+                    updated_contact = self.data_manager.get_contact(self.current_contact.name)
+                    if updated_contact:
+                        self.current_contact = updated_contact
+                        if self.bot_switch:
+                            self.bot_switch.value = not self.current_contact.is_bot_active
+                        
+                        new_message_count = len(self.current_contact.messages)
+                        
+                        # Solo actualizar chat si HAY MENSAJES NUEVOS
+                        if new_message_count > old_message_count:
+                            self.load_chat(self.current_contact.name)
+                
+                # Si hay contactos nuevos, actualizar toda la vista (sidebar)
+                if new_contact_count > old_contact_count:
+                    self.update_view()
+            
             time.sleep(5)
     def _start_background_sync(self):
         thread = threading.Thread(target=self._sync_loop, daemon=True)
@@ -85,7 +110,7 @@ class DashboardView(ft.Row):
                         ft.Container(
                             content=ft.Row([
                                 ft.IconButton(ft.Icons.SETTINGS, icon_color=ft.Colors.WHITE, on_click=self.toggle_settings),
-                                ft.Switch(value=False, active_color="white", active_track_color="green"),
+                                self.bot_switch,
                             ]),
                             padding=ft.padding.only(left=20),
                             
@@ -139,7 +164,7 @@ class DashboardView(ft.Row):
                         ft.Container(
                             content=ft.Row([
                                 ft.IconButton(ft.Icons.SETTINGS, icon_color=ft.Colors.WHITE, on_click=self.toggle_settings),
-                                ft.Switch(value=False, active_color="white", active_track_color="green"),
+                                self.bot_switch,
                             ]),
                             padding=ft.padding.only(left=20),
                             
@@ -171,9 +196,26 @@ class DashboardView(ft.Row):
             expand=3,
         )
         self.controls.append(self.chat_area)
-        
+    
+    def toggle_bot_for_contact(self, e):
+        if not self.current_contact:
+            return
+        is_active = not e.control.value
+        try:
+            response = requests.post(
+                f"{self.data_manager.URL}/api/contacts/{self.current_contact.phone}/toggle-bot/",
+                headers={"Authorization": self.data_manager.api_token},
+                json={"is_active": is_active}
+            )
+            if response.status_code == 200:
+                self.current_contact.is_bot_active = is_active
+        except Exception as e:
+            print(f"Error cambiando el toggle del bot: {e}")
+    
     def load_chat(self, contact_name):
         self.current_contact = self.data_manager.get_contact(contact_name)
+        if self.bot_switch and self.current_contact:
+            self.bot_switch.value = not self.current_contact.is_bot_active
         self.message_column.controls.clear()
         if self.current_contact:
             for msg in self.current_contact.messages:
@@ -187,6 +229,19 @@ class DashboardView(ft.Row):
             return
         text = self.entry.value
         self.entry.value = ""
+        
+        try:
+            response = requests.post(
+                f"{self.data_manager.URL}/api/contacts/{self.current_contact.phone}/send-message/",
+                headers={"Authorization": self.data_manager.api_token},
+                json={"text": text}
+            )
+            if response.status_code != 200:
+                print(f"Error enviando el mensaje: {response.text}")
+                return
+        except Exception as e:
+            print(f"Error: {e}")
+            return
         
         user_msg = Message(user="BOTY", text=text, time="AHORA", is_bot=True)
         self.current_contact.add_message(user_msg)

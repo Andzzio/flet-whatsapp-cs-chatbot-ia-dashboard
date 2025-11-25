@@ -10,7 +10,7 @@ class DataManager:
         self.file_path = "storage/data/data.json"
         self.api_token = None
         self.contacts = {}
-        self.URL = "https://django-whatsapp-cs-chatbot-ia-backend.onrender.com/api/sync/"
+        self.URL = "https://django-whatsapp-cs-chatbot-ia-backend.onrender.com"
         self.load_data()
     def sync_from_server(self):
         if self.api_token == None:
@@ -20,7 +20,7 @@ class DataManager:
             headers = {
                 "Authorization": self.api_token
             }
-            response = requests.get(self.URL, headers=headers)
+            response = requests.get(f"{self.URL}/api/sync/", headers=headers)
             if response.status_code == 200:
                 data = response.json()
                 server_contacts = data.get("contacts", [])
